@@ -9,7 +9,6 @@
         <Label Content="0" Height="50" HorizontalAlignment="Left" Margin="718,54,0,0" Name="lblScore" VerticalAlignment="Top" Width="158" FontFamily="Showcard Gothic" FontSize="30" />
         <Canvas Height="600" HorizontalAlignment="Left" Margin="111,12,0,0" Name="canvas1" VerticalAlignment="Top" Width="600">
             <Image Height="600" Width="600" Source="Resources/logo.png"/>
-
         </Canvas>
         <TextBlock Height="300" Name="tbGameOver" Text="   Game Over!" Width="300" FontFamily="Levenim MT" FontSize="36" Background="#79483232" Foreground="#FFFC0000" Visibility="Hidden" Margin="111,12,164,12" />
         <ProgressBar HorizontalAlignment="Left" Height="24" Margin="111,617,0,0" VerticalAlignment="Top" Width="498" Value="60"/>

@@ -20,14 +20,19 @@ namespace Snake
     /// </summary>
     public partial class MainWindow : Window
     {
+        static bool flagPoisoned = false;
         //Поле на котором живет змея
         Entity field;
         // голова змеи
         Head head;
+        // отравленная голова
+        PoisonedHead poisonedHead;
         // вся змея
         List<PositionedEntity> snake;
         // яблоко
         Apple apple;
+        // отравленное яблоко
+        PoisonedApple poisonedApple;
         //количество очков
         int score;
         //таймер по которому 
@@ -59,10 +64,24 @@ namespace Snake
                 Canvas.SetLeft(p.image, p.x);
             }
 
-            //обновляем положение яблока
-            Canvas.SetTop(apple.image, apple.y);
-            Canvas.SetLeft(apple.image, apple.x);
-            
+            bool poisonedChance = false;
+            if (score > 0)
+            {
+                poisonedChance = PoisonedAppleChance();
+                flagPoisoned = poisonedChance;
+            }
+
+            if (poisonedChance == false) {
+                //обновляем положение яблока
+                Canvas.SetTop(apple.image, apple.y);
+                Canvas.SetLeft(apple.image, apple.x);
+            }
+            else
+            {
+                Canvas.SetTop(poisonedApple.image, poisonedApple.y);
+                Canvas.SetLeft(poisonedApple.image, poisonedApple.x);
+            }
+
             //обновляем количество очков
             lblScore.Content = String.Format("{0}000", score);
         }
@@ -110,6 +129,17 @@ namespace Snake
                 canvas1.Children.Add(part.image);
                 snake.Add(part);
             }
+            else if (head.x == poisonedApple.x && head.y == poisonedApple.y)
+            {
+                //увеличиваем счет
+                score += 25;
+                //двигаем яблоко на новое место
+                apple.move();
+                // добавляем новый сегмент к змее
+                var part = new BodyPart(snake.Last());
+                canvas1.Children.Add(part.image);
+                snake.Add(part);
+            }
             //перерисовываем экран
             UpdateField();
         }
@@ -148,18 +178,31 @@ namespace Snake
             
             // добавляем поле на канвас
             canvas1.Children.Add(field.image);
-            // создаем новое яблоко и добавлем его
-            apple = new Apple(snake);
-            canvas1.Children.Add(apple.image);
-            // создаем голову
-            head = new Head();
-            snake.Add(head);
-            canvas1.Children.Add(head.image);
-            
+
+            if (flagPoisoned == false)
+            {
+                // создаем новое яблоко и добавлем его
+                apple = new Apple(snake);
+                canvas1.Children.Add(apple.image);
+                // создаем голову
+                head = new Head();
+                snake.Add(head);
+                canvas1.Children.Add(head.image);
+            }
+            else
+            {
+                // создаем отравленное яблоко
+                poisonedApple = new PoisonedApple(snake);
+                canvas1.Children.Add(poisonedApple.image);
+                // создаем отравленную голову
+                poisonedHead = new PoisonedHead();
+                snake.Add(head);
+                canvas1.Children.Add(poisonedHead.image);
+            }
+
             //запускаем таймер
             moveTimer.Start();
             UpdateField();
-
         }
         
         public class Entity
@@ -226,10 +269,53 @@ namespace Snake
             }
         }
 
+         static public bool PoisonedAppleChance()
+        {
+            Random random = new Random();
+            bool poisonedResult = false;
+            int chance = random.Next(0, 100);
+            if (chance <= 50)
+                poisonedResult = true;
+            return poisonedResult;
+        }
+
         public class Apple : PositionedEntity
         {
             List<PositionedEntity> m_snake;
             public Apple(List<PositionedEntity> s)
+                : base(0, 0, 40, 40, "pack://application:,,,/Resources/fruit.png")
+            {
+                m_snake = s;
+                move();
+            }
+
+            public override void move()
+            {
+                Random rand = new Random();
+                do
+                {
+                    x = rand.Next(13) * 40 + 40;
+                    y = rand.Next(13) * 40 + 40;
+                    bool overlap = false;
+                    foreach (var p in m_snake)
+                    {
+                        if (p.x == x && p.y == y)
+                        {
+                            overlap = true;
+                            break;
+                        }
+                    }
+                    if (!overlap)
+                        break;
+                } while (true);
+
+            }
+        }
+
+        public class PoisonedApple : PositionedEntity
+        {
+            List<PositionedEntity> m_snake;
+            public PoisonedApple(List<PositionedEntity> s)
                 : base(0, 0, 40, 40, "pack://application:,,,/Resources/fruit.png")
             {
                 m_snake = s;
@@ -278,7 +364,7 @@ namespace Snake
             }
 
             public Head()
-                : base(280, 280, 40, 40, "pack://application:,,,/Resources/head.png")
+                : base(280, 280, 40, 40, "pack://application:,,,/Resources/headTaras.png")
             {
                 image.RenderTransformOrigin = new Point(0.5, 0.5);
                 m_direction = Direction.NONE;
@@ -304,11 +390,57 @@ namespace Snake
             }
         }
 
+        public class PoisonedHead : PositionedEntity
+        {
+            public enum Direction
+            {
+                RIGHT, DOWN, LEFT, UP, NONE
+            };
+
+            Direction m_direction;
+
+            public Direction direction
+            {
+                set
+                {
+                    m_direction = value;
+                    RotateTransform rotateTransform = new RotateTransform(90 * (int)value);
+                    image.RenderTransform = rotateTransform;
+                }
+            }
+
+            public PoisonedHead()
+                : base(280, 280, 40, 40, "pack://application:,,,/Resources/headTarasPoisoned.png")
+            {
+                image.RenderTransformOrigin = new Point(0.5, 0.5);
+                m_direction = Direction.NONE;
+            }
+
+            public override void move()
+            {
+                switch (m_direction)
+                {
+                    case Direction.UP:
+                        y += 40;
+                        break;
+                    case Direction.DOWN:
+                        y -= 40;
+                        break;
+                    case Direction.RIGHT:
+                        x -= 40;
+                        break;
+                    case Direction.LEFT:
+                        x += 40;
+                        break;
+                }
+            }
+        }
+
         public class BodyPart : PositionedEntity
         {
             PositionedEntity m_next;
             public BodyPart(PositionedEntity next)
-                : base(next.x, next.y, 40, 40, "pack://application:,,,/Resources/body.png")
+                : base(next.x, next.y, 40, 40, "pack://application:,,,/Resources/bodyTaras.png")
             {
                 m_next = next;
             }
