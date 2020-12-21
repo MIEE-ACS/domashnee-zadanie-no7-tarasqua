@@ -21,7 +21,7 @@ namespace Snake
     /// </summary>
     public partial class MainWindow : Window
     {
-        static bool flagPoisoned = false;
+        static bool flagPoisoned;
         //Поле на котором живет змея
         Entity field;
         // голова змеи
@@ -61,11 +61,7 @@ namespace Snake
                 Canvas.SetLeft(p.image, p.x);
             }
 
-            bool poisonedChance = false;
-            if (score > 0)
-            {
-                flagPoisoned = PoisonedAppleChance();
-            }
+            PoisonedAppleChance();
 
             //обновляем положение яблока
             Canvas.SetTop(apple.image, apple.y);
@@ -395,14 +391,14 @@ namespace Snake
             }
         }
 
-        static public bool PoisonedAppleChance()
+        static public void PoisonedAppleChance()
         {
             Random random = new Random();
             bool poisonedResult = false;
             int chance = random.Next(0, 100);
-            if (chance <= 50)
+            if (chance <= 100)
                 poisonedResult = true;
-            return poisonedResult;
+            flagPoisoned = poisonedResult;
         }
     }
 }
