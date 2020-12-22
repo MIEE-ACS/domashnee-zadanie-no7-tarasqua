@@ -1,23 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace Snake
 {
-    /// <summary>
-    /// Логика взаимодействия для MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         // флаг, отвечающий за выпадание яблока и флаг, который отвечает за инверсию управления
@@ -37,9 +28,6 @@ namespace Snake
         int score;
         // таймер по которому 
         DispatcherTimer moveTimer;
-        // отравленная голова
-        string poisonedHeadRec = "pack://application:,,,/Resources/headTarasPoisoned.png";
-
 
         //конструктор формы, выполняется при запуске программы
         public MainWindow()
@@ -93,14 +81,14 @@ namespace Snake
         //обработчик тика таймера. Все движение происходит здесь
         void moveTimer_Tick(object sender, EventArgs e)
         {
-
+            //обработчик времени действия отравленного яблока
             if (flagOfInversMove == true)
             {
                 timerIfInverTrue++;
-                lbAppleTimer.Content = timerIfInverTrue.ToString();
                 if (timerIfInverTrue % 240 == 0)
                 {
                     flagOfInversMove = false;
+                    head.ChangeHeadOnHealthy();
                 }
             }
 
@@ -137,6 +125,7 @@ namespace Snake
             //проверяем, что голова змеи врезалась в яблоко
             if (head.x == apple.x && head.y == apple.y)
             {
+                progressBar.Value++;
                 //увеличиваем счет
                 score++;
                 //двигаем яблоко на новое место
@@ -156,28 +145,16 @@ namespace Snake
                     }
                 }
             }
+            //проверяем, что голова врезалась в отравленное яблоко
             else if (head.x == poisonedApple.x && head.y == poisonedApple.y)
             {
                 score += 25;
+                poisonedApple.image.Visibility = Visibility.Hidden;
                 flagOfInversMove = true;
-                ChangeHead(head);
+                head.ChangeHeadOnPoisoned();
             }
             //перерисовываем экран
             UpdateField();
-        }
-
-        public Image poisonedImage;
-        public void ChangeHead(Head head)
-        {
-            poisonedImage = new Image();
-            poisonedImage.Source = (new ImageSourceConverter()).ConvertFromString(poisonedHeadRec) as ImageSource;
-            poisonedImage.Width = 40;
-            poisonedImage.Height = 40;
-
-            head.image = poisonedImage;
-            snake.Remove(head);
-            snake.Add(head);
-            canvas1.Children.Add(head.image);
         }
 
         // Обработчик нажатия на кнопку клавиатуры
@@ -358,7 +335,7 @@ namespace Snake
         {
             List<PositionedEntity> m_snake;
             public PoisonedApple(List<PositionedEntity> s)
-                : base(0, 0, 40, 40, "pack://application:,,,/Resources/apple.png")
+                : base(0, 0, 40, 40, "pack://application:,,,/Resources/fruit.png")
             {
                 m_snake = s;
                 move();
@@ -404,6 +381,10 @@ namespace Snake
                     RotateTransform rotateTransform = new RotateTransform(90 * (int)value);
                     image.RenderTransform = rotateTransform;
                 }
+                get
+                {
+                    return m_direction;
+                }
             }
 
             public Head()
@@ -431,6 +412,16 @@ namespace Snake
                         break;
                 }
             }
+
+            public void ChangeHeadOnPoisoned()
+            {
+                image.Source = (new ImageSourceConverter()).ConvertFromString("pack://application:,,,/Resources/headTarasPoisoned.png") as ImageSource;
+            }
+
+            public void ChangeHeadOnHealthy()
+            {
+                image.Source = (new ImageSourceConverter()).ConvertFromString("pack://application:,,,/Resources/headTaras.png") as ImageSource;
+            }
         }
 
         public class BodyPart : PositionedEntity
@@ -453,7 +444,7 @@ namespace Snake
         {
             Random random = new Random();
             int result = random.Next(1, 100);
-            if (result >= 50)
+            if (result >= 95)
                 flagOfPoisoned = true;
         }
     }
