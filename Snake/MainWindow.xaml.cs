@@ -13,7 +13,6 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 
-
 namespace Snake
 {
     /// <summary>
@@ -21,8 +20,10 @@ namespace Snake
     /// </summary>
     public partial class MainWindow : Window
     {
-        static bool flagPoisoned;
-        //Поле на котором живет змея
+        // флаг, отвечающий за выпадание яблока и флаг, который отвечает за инверсию управления
+        static public bool flagOfPoisoned, flagOfInversMove;
+
+        // Поле на котором живет змея
         Entity field;
         // голова змеи
         Head head;
@@ -30,10 +31,15 @@ namespace Snake
         List<PositionedEntity> snake;
         // яблоко
         Apple apple;
-        //количество очков
+        // отравленное яблоко
+        PoisonedApple poisonedApple;
+        // количество очков
         int score;
-        //таймер по которому 
+        // таймер по которому 
         DispatcherTimer moveTimer;
+        // отравленная голова
+        string poisonedHeadRec = "pack://application:,,,/Resources/headTarasPoisoned.png";
+
 
         //конструктор формы, выполняется при запуске программы
         public MainWindow()
@@ -46,14 +52,14 @@ namespace Snake
 
             //создаем таймер срабатывающий раз в 300 мс
             moveTimer = new DispatcherTimer();
-            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 300);
+            moveTimer.Interval = new TimeSpan(0, 0, 0, 0, 250);
             moveTimer.Tick += new EventHandler(moveTimer_Tick);
-
         }
 
         //метод перерисовывающий экран
         private void UpdateField()
         {
+            Random rand = new Random();
             //обновляем положение элементов змеи
             foreach (var p in snake)
             {
@@ -61,19 +67,43 @@ namespace Snake
                 Canvas.SetLeft(p.image, p.x);
             }
 
-            PoisonedAppleChance();
-
             //обновляем положение яблока
             Canvas.SetTop(apple.image, apple.y);
             Canvas.SetLeft(apple.image, apple.x);
+
+            if (poisonedApple.y == apple.y || poisonedApple.x == apple.x)
+            {
+                poisonedApple.y = rand.Next(13) * 40 + 40;
+                poisonedApple.x = rand.Next(13) * 40 + 40;
+            }
+            else
+            {
+                //положение отравленного яблока
+                Canvas.SetTop(poisonedApple.image, poisonedApple.y);
+                Canvas.SetLeft(poisonedApple.image, poisonedApple.x);
+            }
 
             //обновляем количество очков
             lblScore.Content = String.Format("{0}000", score);
         }
 
+        // таймер, который включается при возникновении отравленного яблока
+        public int timerIfInverTrue = 0;
+
         //обработчик тика таймера. Все движение происходит здесь
         void moveTimer_Tick(object sender, EventArgs e)
         {
+
+            if (flagOfInversMove == true)
+            {
+                timerIfInverTrue++;
+                lbAppleTimer.Content = timerIfInverTrue.ToString();
+                if (timerIfInverTrue % 240 == 0)
+                {
+                    flagOfInversMove = false;
+                }
+            }
+
             //в обратном порядке двигаем все элементы змеи
             foreach (var p in Enumerable.Reverse(snake))
             {
@@ -89,6 +119,7 @@ namespace Snake
                     //мы проиграли
                     moveTimer.Stop();
                     tbGameOver.Visibility = Visibility.Visible;
+                    flagOfInversMove = false;
                     return;
                 }
             }
@@ -99,11 +130,12 @@ namespace Snake
                 //мы проиграли
                 moveTimer.Stop();
                 tbGameOver.Visibility = Visibility.Visible;
+                flagOfInversMove = false;
                 return;
             }
 
-            //проверяем, что голова змеи столкнулась с яблоком
-            if (head.x == apple.x && head.y == apple.y && apple.poison == false)
+            //проверяем, что голова змеи врезалась в яблоко
+            if (head.x == apple.x && head.y == apple.y)
             {
                 //увеличиваем счет
                 score++;
@@ -113,44 +145,79 @@ namespace Snake
                 var part = new BodyPart(snake.Last());
                 canvas1.Children.Add(part.image);
                 snake.Add(part);
+                // прокаем отравленное яблоко
+                if (poisonedApple.image.Visibility == Visibility.Hidden)
+                {
+                    ChanceOfPoisonedApple();
+                    if (flagOfPoisoned == true)
+                    {
+                        poisonedApple = new PoisonedApple(snake);
+                        canvas1.Children.Add(poisonedApple.image);
+                    }
+                }
             }
-            else if(head.x == apple.x && head.y == apple.y && apple.poison == true)
+            else if (head.x == poisonedApple.x && head.y == poisonedApple.y)
             {
-                //увеличиваем счет
                 score += 25;
-                //двигаем яблоко на новое место
-                apple.move();
-                // добавляем новый сегмент к змее
-                var part = new BodyPart(snake.Last());
-                canvas1.Children.Add(part.image);
-                snake.Add(part);
-                //меняем голову змее
-                string newHead = "pack://application:,,,/Resources/headTarasPoisoned.png";
-                Image newImage = new Image();
-                newImage.Source = (new ImageSourceConverter()).ConvertFromString(newHead) as ImageSource;
+                flagOfInversMove = true;
+                ChangeHead(head);
             }
-
             //перерисовываем экран
             UpdateField();
+        }
+
+        public Image poisonedImage;
+        public void ChangeHead(Head head)
+        {
+            poisonedImage = new Image();
+            poisonedImage.Source = (new ImageSourceConverter()).ConvertFromString(poisonedHeadRec) as ImageSource;
+            poisonedImage.Width = 40;
+            poisonedImage.Height = 40;
+
+            head.image = poisonedImage;
+            snake.Remove(head);
+            snake.Add(head);
+            canvas1.Children.Add(head.image);
         }
 
         // Обработчик нажатия на кнопку клавиатуры
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            switch (e.Key)
+            if (flagOfInversMove == false)
             {
-                case Key.Up:
-                    head.direction = Head.Direction.UP;
-                    break;
-                case Key.Down:
-                    head.direction = Head.Direction.DOWN;
-                    break;
-                case Key.Left:
-                    head.direction = Head.Direction.LEFT;
-                    break;
-                case Key.Right:
-                    head.direction = Head.Direction.RIGHT;
-                    break;
+                switch (e.Key)
+                {
+                    case Key.Up:
+                        head.direction = Head.Direction.UP;
+                        break;
+                    case Key.Down:
+                        head.direction = Head.Direction.DOWN;
+                        break;
+                    case Key.Left:
+                        head.direction = Head.Direction.LEFT;
+                        break;
+                    case Key.Right:
+                        head.direction = Head.Direction.RIGHT;
+                        break;
+                }
+            }
+            else
+            {
+                switch (e.Key)
+                {
+                    case Key.Up:
+                        head.direction = Head.Direction.DOWN;
+                        break;
+                    case Key.Down:
+                        head.direction = Head.Direction.UP;
+                        break;
+                    case Key.Left:
+                        head.direction = Head.Direction.RIGHT;
+                        break;
+                    case Key.Right:
+                        head.direction = Head.Direction.LEFT;
+                        break;
+                }
             }
         }
 
@@ -168,10 +235,13 @@ namespace Snake
 
             // добавляем поле на канвас
             canvas1.Children.Add(field.image);
-
             // создаем новое яблоко и добавлем его
             apple = new Apple(snake);
             canvas1.Children.Add(apple.image);
+            // создаем отравленное яблоко и скрываем его
+            poisonedApple = new PoisonedApple(snake);
+            canvas1.Children.Add(poisonedApple.image);
+            poisonedApple.image.Visibility = Visibility.Hidden;
             // создаем голову
             head = new Head();
             snake.Add(head);
@@ -180,6 +250,7 @@ namespace Snake
             //запускаем таймер
             moveTimer.Start();
             UpdateField();
+
         }
 
         public class Entity
@@ -216,7 +287,6 @@ namespace Snake
         {
             protected int m_x;
             protected int m_y;
-            protected bool m_poison;
             public PositionedEntity(int x, int y, int w, int h, string image)
                 : base(w, h, image)
             {
@@ -225,8 +295,6 @@ namespace Snake
             }
 
             public virtual void move() { }
-
-            public virtual void poisoned() { }
 
             public int x
             {
@@ -249,18 +317,6 @@ namespace Snake
                 set
                 {
                     m_y = value;
-                }
-            }
-
-            public bool poison
-            {
-                get
-                {
-                    return m_poison;
-                }
-                set
-                {
-                    m_poison = value;
                 }
             }
         }
@@ -294,13 +350,41 @@ namespace Snake
                     if (!overlap)
                         break;
                 } while (true);
-            }
 
-            public override void poisoned()
+            }
+        }
+
+        public class PoisonedApple : PositionedEntity
+        {
+            List<PositionedEntity> m_snake;
+            public PoisonedApple(List<PositionedEntity> s)
+                : base(0, 0, 40, 40, "pack://application:,,,/Resources/apple.png")
             {
-                poison = flagPoisoned;
+                m_snake = s;
+                move();
             }
 
+            public override void move()
+            {
+                Random rand = new Random();
+                do
+                {
+                    x = rand.Next(13) * 40 + 40;
+                    y = rand.Next(13) * 40 + 40;
+                    bool overlap = false;
+                    foreach (var p in m_snake)
+                    {
+                        if (p.x == x && p.y == y)
+                        {
+                            overlap = true;
+                            break;
+                        }
+                    }
+                    if (!overlap)
+                        break;
+                } while (true);
+
+            }
         }
 
         public class Head : PositionedEntity
@@ -331,47 +415,21 @@ namespace Snake
 
             public override void move()
             {
-                if (poison == false)
+                switch (m_direction)
                 {
-                    switch (m_direction)
-                    {
-                        case Direction.DOWN:
-                            y += 40;
-                            break;
-                        case Direction.UP:
-                            y -= 40;
-                            break;
-                        case Direction.LEFT:
-                            x -= 40;
-                            break;
-                        case Direction.RIGHT:
-                            x += 40;
-                            break;
-                    }
+                    case Direction.DOWN:
+                        y += 40;
+                        break;
+                    case Direction.UP:
+                        y -= 40;
+                        break;
+                    case Direction.LEFT:
+                        x -= 40;
+                        break;
+                    case Direction.RIGHT:
+                        x += 40;
+                        break;
                 }
-                else
-                {
-                    switch (m_direction)
-                    {
-                        case Direction.UP:
-                            y += 40;
-                            break;
-                        case Direction.DOWN:
-                            y -= 40;
-                            break;
-                        case Direction.RIGHT:
-                            x -= 40;
-                            break;
-                        case Direction.LEFT:
-                            x += 40;
-                            break;
-                    }
-                }
-            }
-
-            public override void poisoned()
-            {
-                poison = flagPoisoned;
             }
         }
 
@@ -391,14 +449,12 @@ namespace Snake
             }
         }
 
-        static public void PoisonedAppleChance()
+        static public void ChanceOfPoisonedApple()
         {
             Random random = new Random();
-            bool poisonedResult = false;
-            int chance = random.Next(0, 100);
-            if (chance <= 100)
-                poisonedResult = true;
-            flagPoisoned = poisonedResult;
+            int result = random.Next(1, 100);
+            if (result >= 50)
+                flagOfPoisoned = true;
         }
     }
 }
